@@ -127,3 +127,9 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Zappa
+zappa_settings.json
+
+# VS Code
+.vscode/

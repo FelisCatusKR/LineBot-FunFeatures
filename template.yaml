@@ -16,10 +16,10 @@ Parameters:
 
 Resources:
   ResponseForPostRequests:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./src
-      Handler: app.response
+      Handler: app.main.response
       Runtime: python3.7
       Environment:
         Variables:
@@ -29,6 +29,7 @@ Resources:
             Ref: LineBotSecret
           LINEBOT_ACCESS_TOKEN:
             Ref: LineBotAccessToken
+      Policies: AmazonDynamoDBFullAccess
       Events:
         PutRequest:
           Type: Api

@@ -13,6 +13,8 @@ handler = WebhookHandler(LINEBOT_SECRET)
 
 @handler.add(MessageEvent, message=TextMessage)
 def message(line_event):
+    if line_event.source.type != "group":
+        return
     p1 = re.compile(CELEBRATING_TARGET)
     p2 = re.compile("생일")
     text = line_event.message.text
@@ -20,6 +22,8 @@ def message(line_event):
         celebrating_birthday(line_event)
     elif text == "!순위":
         send_leaderboard(line_event)
+    else:
+        pass
 
 
 def response(event, context):
@@ -42,5 +46,5 @@ def response(event, context):
         return error_json
     except InvalidSignatureError:
         return error_json
-
-    return ok_json
+    else:
+        return ok_json

@@ -8,21 +8,18 @@ line_bot_api = LineBotApi(LINEBOT_ACCESS_TOKEN)
 
 
 def celebrating_birthday(line_event):
-    if line_event.source.type == "group":
-        group_id = line_event.source.group_id
-    else:
-        group_id = "test"
+    group_id = line_event.source.group_id
     user_id = line_event.source.user_id
     update_amount(group_id, user_id)
     line_bot_api.reply_message(line_event.reply_token, TextSendMessage("🎉"))
 
 
 def send_leaderboard(line_event):
-    if line_event.source.type != "group":
-        return
     group_id = line_event.source.group_id
+    line_bot_api.push_message(
+        group_id, [TextSendMessage("집계중입니다...")], notification_disabled=True
+    )
     response = get_list_of_amount(group_id)
-    count = 1
     contents = {
         "type": "bubble",
         "styles": {"header": {"backgroundColor": "#E3D3A3"}},
@@ -57,48 +54,48 @@ def send_leaderboard(line_event):
         },
     }
 
+    count = 1
+    rank = 1
+    last_amount = 0
     for item in response["Items"]:
-        leaderboard_item = {"type": "box", "layout": "horizontal", "contents": None}
+        if int(item["amount"]) != last_amount:
+            rank = count
+            last_amount = int(item["amount"])
         user_id = item["user_id"]
         user_profile = line_bot_api.get_group_member_profile(group_id, user_id)
         user_name = user_profile.display_name
-        columns = [None, None, None]
-        columns[0] = {
-            "type": "text",
-            "text": f"{count}위",
-            "flex": 3,
-            "weight": "bold",
+        leaderboard_item = {
+            "type": "box",
+            "layout": "horizontal",
+            "contents": [
+                {"type": "text", "text": f"{rank}위", "flex": 3, "weight": "bold"},
+                {"type": "text", "text": user_name, "flex": 6, "weight": "bold"},
+                {
+                    "type": "text",
+                    "text": str(item["amount"]),
+                    "flex": 2,
+                    "align": "end",
+                    "gravity": "center",
+                },
+            ],
         }
-        columns[1] = {
-            "type": "text",
-            "text": user_name,
-            "flex": 6,
-            "weight": "bold",
-        }
-        columns[2] = {
-            "type": "text",
-            "text": str(item["amount"]),
-            "flex": 2,
-            "align": "end",
-            "gravity": "center",
-        }
-        if count is 1:
-            columns[0]["size"] = "xxl"
-            columns[0]["color"] = "#A4B60F"
-            columns[1]["size"] = "xxl"
-        elif count is 2:
-            columns[0]["size"] = "xl"
-            columns[0]["color"] = "#878787"
-            columns[1]["size"] = "xl"
-        elif count is 3:
-            columns[0]["size"] = "lg"
-            columns[0]["color"] = "#8A6200"
-            columns[1]["size"] = "lg"
+        if rank is 1:
+            leaderboard_item["contents"][0]["size"] = "xxl"
+            leaderboard_item["contents"][0]["color"] = "#A4B60F"
+            leaderboard_item["contents"][1]["size"] = "xxl"
+        elif rank is 2:
+            leaderboard_item["contents"][0]["size"] = "xl"
+            leaderboard_item["contents"][0]["color"] = "#878787"
+            leaderboard_item["contents"][1]["size"] = "xl"
+        elif rank is 3:
+            leaderboard_item["contents"][0]["size"] = "lg"
+            leaderboard_item["contents"][0]["color"] = "#8A6200"
+            leaderboard_item["contents"][1]["size"] = "lg"
         else:
             pass
-        leaderboard_item["contents"] = columns
         contents["body"]["contents"].append(leaderboard_item)
         count += 1
+
     line_bot_api.reply_message(
         line_event.reply_token,
         FlexSendMessage(alt_text="Leaderboard", contents=contents),

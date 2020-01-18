@@ -60,7 +60,7 @@ def send_leaderboard(line_event):
     for item in response["Items"]:
         leaderboard_item = {"type": "box", "layout": "horizontal", "contents": None}
         user_id = item["user_id"]
-        user_profile = line_bot_api.get_profile(user_id)
+        user_profile = line_bot_api.get_group_member_profile(group_id, user_id)
         user_name = user_profile.display_name
         columns = [None, None, None]
         columns[0] = {

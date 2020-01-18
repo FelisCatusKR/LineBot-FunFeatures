@@ -77,7 +77,3 @@ def get_list_of_amount(group_id: str):
         KeyConditionExpression=Key("group_id").eq(group_id),
         ScanIndexForward=False,
     )
-
-
-if __name__ == "__main__":
-    print(get_list_of_amount("1"))

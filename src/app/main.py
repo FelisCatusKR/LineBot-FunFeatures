@@ -5,7 +5,7 @@ from linebot.models import MessageEvent, TextMessage
 from linebot.exceptions import LineBotApiError, InvalidSignatureError
 
 from .config import LINEBOT_SECRET, CELEBRATING_TARGET, logger
-from .leaderboard import celebrating_birthday, leaderboard
+from .leaderboard import celebrating_birthday, send_leaderboard
 
 
 handler = WebhookHandler(LINEBOT_SECRET)
@@ -19,7 +19,7 @@ def message(line_event):
     if p1.search(text) and p2.search(text):
         celebrating_birthday(line_event)
     elif text == "!순위":
-        leaderboard(line_event)
+        send_leaderboard(line_event)
 
 
 def response(event, context):

@@ -12,7 +12,7 @@ dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-2")
 
 def create_table():
     try:
-        return dynamodb.create_table(
+        response = dynamodb.create_table(
             TableName=TABLE_NAME,
             KeySchema=[
                 {"AttributeName": "group_id", "KeyType": "HASH"},
@@ -34,18 +34,21 @@ def create_table():
             ],
             ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
         )
-    except ClientError as e:
+    except ClientError:
         raise
+    else:
+        return response
 
 
 def get_table():
     try:
-        return dynamodb.Table(TABLE_NAME)
+        response = dynamodb.Table(TABLE_NAME)
     except ClientError as e:
         if e.response["Error"]["Code"] == "ResourceNotFoundException":
-            return create_table()
+            response = create_table()
         else:
             raise
+    return response
 
 
 def update_amount(group_id: str, user_id: str):
@@ -74,3 +77,7 @@ def get_list_of_amount(group_id: str):
         KeyConditionExpression=Key("group_id").eq(group_id),
         ScanIndexForward=False,
     )
+
+
+if __name__ == "__main__":
+    print(get_list_of_amount("1"))

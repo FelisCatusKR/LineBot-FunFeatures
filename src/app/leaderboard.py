@@ -3,20 +3,29 @@ from linebot.models import TextSendMessage, FlexSendMessage
 
 from functools import wraps
 
-from .config import LINEBOT_ACCESS_TOKEN, CELEBRATING_TARGET
+from .config import LINE_USER_ID, LINEBOT_ACCESS_TOKEN, CELEBRATING_TARGET
 from .database import update_amount, get_list_of_amount
 
 line_bot_api = LineBotApi(LINEBOT_ACCESS_TOKEN)
 
 
 def exception_handler(original_function):
-
     @wraps(original_function)
     def wrapper_function(event=None, *args, **kwargs):
         try:
             return original_function(event, *args, **kwargs)
         except Exception as e:
-            line_bot_api.push_message({본인의 라인 유저 아이디로 대체}, TextSendMessage(text=("전달된 명령어 : " + event.message.text + "\nexception detail : " + e.__str__())))
+            line_bot_api.push_message(
+                LINE_USER_ID,
+                TextSendMessage(
+                    text=(
+                        "전달된 명령어 : "
+                        + event.message.text
+                        + "\nexception detail : "
+                        + e.__str__()
+                    )
+                ),
+            )
 
     return wrapper_function
 

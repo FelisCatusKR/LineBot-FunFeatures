@@ -5,6 +5,8 @@ import sys
 logger = logging.getLogger()
 logger.setLevel(logging.ERROR)
 
+LINE_USER_ID = os.getenv("LINE_USER_ID")
+
 LINEBOT_SECRET = os.getenv("LINEBOT_SECRET")
 LINEBOT_ACCESS_TOKEN = os.getenv("LINEBOT_ACCESS_TOKEN")
 if LINEBOT_SECRET is None:

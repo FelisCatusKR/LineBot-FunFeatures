@@ -4,6 +4,9 @@ Description: >
   LineBot-HappyBirthdayLeaderboard
 
 Parameters:
+  LineUserID:
+    NoEcho: true
+    Type: String
   CelebratingTarget:
     NoEcho: true
     Type: String
@@ -23,6 +26,8 @@ Resources:
       Runtime: python3.7
       Environment:
         Variables:
+          LINE_USER_ID:
+            Ref: LineUserID
           CELEBRATING_TARGET:
             Ref: CelebratingTarget
           LINEBOT_SECRET:
@@ -30,6 +35,7 @@ Resources:
           LINEBOT_ACCESS_TOKEN:
             Ref: LineBotAccessToken
       Policies: AmazonDynamoDBFullAccess
+      Timeout: 30
       Events:
         PutRequest:
           Type: Api

@@ -1,13 +1,12 @@
 import decimal
 
-import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
+from . import dynamodb
+
 TABLE_NAME = "linebot-happybirthdayleaderboard-leaderdoards"
 INDEX_NAME = "group_id-amount-index"
-
-dynamodb = boto3.resource("dynamodb", region_name="ap-northeast-2")
 
 
 def create_table():
@@ -32,7 +31,7 @@ def create_table():
                     "Projection": {"ProjectionType": "ALL"},
                 }
             ],
-            ProvisionedThroughput={"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
+            ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1},
         )
     except ClientError:
         raise

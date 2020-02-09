@@ -1,4 +1,5 @@
-from typing import List
+import decimal
+import typing
 
 from botocore.exceptions import ClientError
 
@@ -15,91 +16,171 @@ class OutOfRangeError(Exception):
     pass
 
 
+class DuplicateItemError(Exception):
+    pass
+
+
 class InvalidUserError(Exception):
     pass
 
 
-def create_table():
+def get_table():
     try:
         response = dynamodb.create_table(
             TableName=TABLE_NAME,
-            KeySchema=[{"AttributeName": "id", "KeyType": "HASH"},],
-            AttributeDefinitions=[{"AttributeName": "id", "AttributeType": "S"},],
+            KeySchema=[{"AttributeName": "group_id", "KeyType": "HASH"},],
+            AttributeDefinitions=[{"AttributeName": "group_id", "AttributeType": "S"},],
             ProvisionedThroughput={"ReadCapacityUnits": 1, "WriteCapacityUnits": 1},
         )
+    except ClientError as e:
+        if e.response["Error"]["Code"] == "ResourceInUseException":
+            try:
+                response = dynamodb.Table(TABLE_NAME)
+            except ClientError:
+                raise
+            else:
+                return response
+        else:
+            raise
+    else:
+        return response
+
+
+def create_vote(group_id: str, user_id: str, title: str, items: typing.List[str]):
+    table = get_table()
+    response = table.get_item(Key={"group_id": group_id})
+    if "Item" not in response:
+        table.put_item(Item={"group_id": group_id, "ongoing": False, "votes": []})
+        response = table.get_item(Key={"group_id": group_id})
+    if response["Item"]["ongoing"] is True:
+        raise OngoingVoteError
+    try:
+        table.update_item(
+            Key={"group_id": group_id},
+            UpdateExpression="SET ongoing = :val, votes = list_append(votes, :vote)",
+            ExpressionAttributeValues={
+                ":val": True,
+                ":vote": [
+                    {
+                        "user_id": user_id,
+                        "title": title,
+                        "item_list": items,
+                        "results": [decimal.Decimal(0)] * len(items),
+                        "answers": {},
+                    }
+                ],
+            },
+        )
+    except ClientError:
+        raise
+    try:
+        response = table.get_item(Key={"group_id": group_id})
     except ClientError:
         raise
     else:
         return response
 
 
-def get_table():
-    try:
-        response = dynamodb.Table(TABLE_NAME)
-    except ClientError as e:
-        if e.response["Error"]["Code"] == "ResourceNotFoundException":
-            response = create_table()
-        else:
-            raise
-    return response
-
-
-def create_vote(user_id: str, title: str, items: List[str]):
+def read_vote(group_id: str):
     table = get_table()
-    item_count = table.item_count
-    if item_count > 0:
-        response = table.get_item(Key={"id": "vote-" + str(item_count + 1).zfill(6)})
-        if response["Item"]["ongoing"] is True:
-            raise OngoingVoteError
-    table.put_item(
-        Item={
-            "id": "vote-" + str(item_count + 1).zfill(6),
-            "user_id": user_id,
-            "title": title,
-            "items": items,
-            "ongoing": True,
-        }
-    )
-
-
-def close_vote(user_id: str):
-    table = get_table()
-    item_count = table.item_count
-    if item_count == 0:
-        raise OutOfRangeError
-    response = table.get_item(Key={"id": "vote-" + str(item_count).zfill(6)})
-    if response["Item"]["ongoing"] is False:
+    response = table.get_item(Key={"group_id": group_id})
+    if "Item" not in response:
+        table.put_item(Item={"group_id": group_id, "ongoing": False, "votes": []})
+        response = table.get_item(Key={"group_id": group_id})
+    if len(response["Item"]["votes"]) == 0:
         raise OngoingVoteError
-    if response["Item"]["user_id"] != user_id:
+    else:
+        return response
+
+
+def close_vote(group_id: str, user_id: str):
+    table = get_table()
+    response = table.get_item(Key={"group_id": group_id})
+    if "Item" not in response or response["Item"]["ongoing"] is False:
+        raise OngoingVoteError
+    vote_idx = len(response["Item"]["votes"]) - 1
+    if response["Item"]["votes"][vote_idx]["user_id"] != user_id:
         raise InvalidUserError
-    table.update_item(
-        Key={"id": "vote-" + str(item_count).zfill(6)},
-        UpdateExpression="SET ongoing = :val",
-        ExpressionAttributeValues={":val": False},
-    )
+    try:
+        table.update_item(
+            Key={"group_id": group_id},
+            UpdateExpression="SET ongoing = :val",
+            ExpressionAttributeValues={":val": False},
+        )
+    except ClientError:
+        raise
+    try:
+        response = table.get_item(Key={"group_id": group_id})
+    except ClientError:
+        raise
+    else:
+        return response
 
 
-def answer_vote(user_id: str, answer: int):
+def answer_vote(group_id: str, user_id: str, answer: int):
     table = get_table()
-    item_count = table.item_count
-    if item_count == 0:
-        raise OutOfRangeError
-    response = table.get_item(Key={"id": "vote-" + str(item_count).zfill(6)})
-    if response["Item"]["ongoing"] is False:
+    response = table.get_item(Key={"group_id": group_id})
+    if "Item" not in response or response["Item"]["ongoing"] is False:
         raise OngoingVoteError
-    if user_id not in response["Item"]["answers"]:
-        pass
-    table.update_item(
-        Key={"id": "vote-" + str(item_count).zfill(6)},
-        UpdateExpression="SET answers = list_append(answers, :val)",
-        ExpressionAttributeValues={":val": [answer]},
-    )
-
-
-def get_vote():
-    table = get_table()
-    item_count = table.item_count
-    if item_count == 0:
+    vote_idx = len(response["Item"]["votes"]) - 1
+    if answer < 0 or answer >= len(response["Item"]["votes"][vote_idx]["item_list"]):
         raise OutOfRangeError
-    response = table.get_item(Key={"id": "vote-" + str(item_count).zfill(6)})
-    return response
+    if user_id not in response["Item"]["votes"][vote_idx]["answers"]:
+        try:
+            table.update_item(
+                Key={"group_id": group_id},
+                UpdateExpression=f"SET votes[{vote_idx}].answers.{user_id} = :val1, votes[{vote_idx}].results[{answer}] = votes[{vote_idx}].results[{answer}] + :val2",
+                ExpressionAttributeValues={
+                    ":val1": decimal.Decimal(answer),
+                    ":val2": decimal.Decimal(1),
+                },
+            )
+        except ClientError:
+            raise
+    else:
+        prev_answer = response["Item"]["votes"][vote_idx]["answers"][user_id]
+        if prev_answer == answer:
+            pass
+        else:
+            try:
+                table.update_item(
+                    Key={"group_id": group_id},
+                    UpdateExpression=f"SET votes[{vote_idx}].answers.{user_id} = :val1, votes[{vote_idx}].results[{prev_answer}] = votes[{vote_idx}].results[{prev_answer}] - :val2, votes[{vote_idx}].results[{answer}] = votes[{vote_idx}].results[{answer}] + :val2",
+                    ExpressionAttributeValues={
+                        ":val1": decimal.Decimal(answer),
+                        ":val2": decimal.Decimal(1),
+                    },
+                )
+            except ClientError:
+                raise
+    try:
+        response = table.get_item(Key={"group_id": group_id})
+    except ClientError:
+        raise
+    else:
+        return response
+
+
+def add_item(group_id: str, user_id: str, item: str):
+    table = get_table()
+    response = table.get_item(Key={"group_id": group_id})
+    if "Item" not in response or response["Item"]["ongoing"] is False:
+        raise OngoingVoteError
+    vote_idx = len(response["Item"]["votes"]) - 1
+    if item in response["Item"]["votes"][vote_idx]["item_list"]:
+        raise DuplicateItemError
+    try:
+        table.update_item(
+            Key={"group_id": group_id},
+            UpdateExpression=f"SET votes[{vote_idx}].item_list = list_append(votes[{vote_idx}].item_list, :val1), votes[{vote_idx}].results = list_append(votes[{vote_idx}].results, :val2)",
+            ExpressionAttributeValues={":val1": [item], ":val2": [decimal.Decimal(0)]},
+        )
+    except ClientError:
+        raise
+    item_idx = len(response["Item"]["votes"][vote_idx]["item_list"])
+    try:
+        response = answer_vote(group_id, user_id, item_idx)
+    except ClientError:
+        raise
+    else:
+        return response

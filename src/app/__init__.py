@@ -5,8 +5,7 @@ from linebot.models import MessageEvent, TextMessage
 
 from app.config import LINEBOT_SECRET, CELEBRATING_TARGET
 from app.message import send_help_message, send_error_message
-from app.message.leaderboard import celebrating_birthday, send_leaderboard
-from app.message.vote import create_vote, answer_vote, close_vote
+from app.message import leaderboard, vote, duckduckgo, etc
 
 handler = WebhookHandler(LINEBOT_SECRET)
 
@@ -20,20 +19,26 @@ def message(line_event):
     text = line_event.message.text
     p3 = re.compile(r"^!(\S+)(| .+)$")
     if p1.search(text) and p2.search(text):
-        celebrating_birthday(line_event)
+        leaderboard.celebrating_birthday(line_event)
     elif p3.match(text):
         command = p3.match(text)[1]
         args = p3.match(text)[2].lstrip()
         if command in ["명령어"]:
             send_help_message(line_event, args)
         elif command in ["순위"]:
-            send_leaderboard(line_event)
+            leaderboard.send_leaderboard(line_event)
         elif command in ["투표시작"]:
-            create_vote(line_event, args)
+            vote.create_vote(line_event, args)
         elif command in ["투표"]:
-            answer_vote(line_event, args)
+            vote.answer_vote(line_event, args)
+        elif command in ["투표항목"]:
+            vote.add_item(line_event, args)
         elif command in ["투표종료"]:
-            close_vote(line_event)
+            vote.close_vote(line_event)
+        elif command in ["선택장애"]:
+            etc.select_random_item(line_event, args)
+        elif command in ["이미지"]:
+            duckduckgo.send_image_search_message(line_event, args)
         else:
             send_error_message(line_event, command)
     else:

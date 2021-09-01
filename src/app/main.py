@@ -5,7 +5,8 @@ from app.config import logger
 
 
 def response(event, context):
-    signature = event["headers"]["X-Line-Signature"]
+    line_header = "X-Line-Signature".lower()
+    signature = event["headers"][line_header]
     body = event["body"]
     ok_json = {"isBase64Encoded": False, "statusCode": 200, "headers": {}, "body": ""}
     error_json = {
